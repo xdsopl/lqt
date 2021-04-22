@@ -54,8 +54,14 @@ int main(int argc, char **argv)
 	for (int j = 0; j < 3; ++j) {
 		for (int i = 0; i < tree_size; ++i) {
 			float val = get_vli(bits);
-			if (val && get_bit(bits))
-				val = -val;
+			if (val) {
+				if (get_bit(bits))
+					val = -val;
+			} else {
+				int cnt = get_vli(bits);
+				for (int k = 0; k < cnt; ++k)
+					tree[i++] = 0;
+			}
 			tree[i] = val;
 		}
 		doit(tree, output->buffer+j, 3, 0, depth, quant[j]);
