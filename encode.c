@@ -27,6 +27,7 @@ void doit(float *tree, float *input, int stride, int level, int depth, int quant
 					sum += tree[pixels+length*2*(j*2+y)+i*2+x];
 			float avg = sum / 4.f;
 			tree[length*j+i] = avg;
+			avg = nearbyintf((quant<<depth) * avg) / (quant<<depth);
 			for (int y = 0; y < 2; ++y)
 				for (int x = 0; x < 2; ++x)
 					tree[pixels+length*2*(j*2+y)+i*2+x] -= avg;
