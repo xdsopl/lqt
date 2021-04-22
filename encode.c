@@ -8,34 +8,34 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "vli.h"
 #include "bits.h"
 
-void doit(float *output, float *input, int stride, int level, int depth, int quant)
+void doit(float *tree, float *input, int stride, int level, int depth, int quant)
 {
 	int length = 1 << level;
 	int pixels = length * length;
 	if (level == depth) {
 		for (int i = 0; i < pixels; ++i)
-			output[i*stride] = input[i*stride];
+			tree[i] = input[i*stride];
 		return;
 	}
-	doit(output+pixels*stride, input, stride, level+1, depth, quant);
+	doit(tree+pixels, input, stride, level+1, depth, quant);
 	for (int j = 0; j < length; ++j) {
 		for (int i = 0; i < length; ++i) {
 			float sum = 0.f;
 			for (int y = 0; y < 2; ++y)
 				for (int x = 0; x < 2; ++x)
-					sum += output[(pixels+length*2*(j*2+y)+i*2+x)*stride];
+					sum += tree[pixels+length*2*(j*2+y)+i*2+x];
 			float avg = sum / 4.f;
-			output[(length*j+i)*stride] = avg;
+			tree[length*j+i] = avg;
 			for (int y = 0; y < 2; ++y)
 				for (int x = 0; x < 2; ++x)
-					output[(pixels+length*2*(j*2+y)+i*2+x)*stride] -= avg;
+					tree[pixels+length*2*(j*2+y)+i*2+x] -= avg;
 		}
 	}
 	if (level == 0)
-		output[0] = nearbyintf((quant<<depth) * output[0]);
+		tree[0] = nearbyintf((quant<<depth) * tree[0]);
 	quant <<= depth - level - 1;
 	for (int i = 0; i < 4 * pixels; ++i)
-		output[(pixels+i)*stride] = nearbyintf(quant * output[(pixels+i)*stride]);
+		tree[pixels+i] = nearbyintf(quant * tree[pixels+i]);
 }
 
 int pow2(int N)
@@ -71,11 +71,9 @@ int main(int argc, char **argv)
 		for (int i = 0; i < 3; ++i)
 			quant[i] = atoi(argv[3+i]);
 	int tree_size = (pixels * 4 - 1) / 3;
-	float *output = malloc(sizeof(float) * 3 * tree_size);
+	float *tree = malloc(sizeof(float) * tree_size);
 	if (mode)
 		ycbcr_image(input);
-	for (int i = 0; i < 3; ++i)
-		doit(output+i, input->buffer+i, 3, 0, depth, quant[i]);
 	struct bits *bits = bits_writer(argv[2]);
 	if (!bits)
 		return 1;
@@ -84,10 +82,11 @@ int main(int argc, char **argv)
 	for (int i = 0; i < 3; ++i)
 		put_vli(bits, quant[i]);
 	for (int j = 0; j < 3; ++j) {
+		doit(tree, input->buffer+j, 3, 0, depth, quant[j]);
 		for (int i = 0; i < tree_size; ++i) {
-			put_vli(bits, fabsf(output[j+3*i]));
-			if (output[j+3*i])
-				put_bit(bits, output[j+3*i] < 0.f);
+			put_vli(bits, fabsf(tree[i]));
+			if (tree[i])
+				put_bit(bits, tree[i] < 0.f);
 		}
 	}
 	close_writer(bits);

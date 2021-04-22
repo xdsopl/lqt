@@ -8,28 +8,28 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "vli.h"
 #include "bits.h"
 
-void doit(float *output, float *input, int stride, int level, int depth, int quant)
+void doit(float *tree, float *output, int stride, int level, int depth, int quant)
 {
 	int length = 1 << level;
 	int pixels = length * length;
 	if (level == depth) {
 		for (int i = 0; i < pixels; ++i)
-			output[i*stride] = input[i*stride];
+			output[i*stride] = tree[i];
 		return;
 	}
 	if (level == 0)
-		input[0] /= quant << depth;
+		tree[0] /= quant << depth;
 	for (int i = 0; i < 4 * pixels; ++i)
-		input[(pixels+i)*stride] /= quant << (depth - level - 1);
+		tree[pixels+i] /= quant << (depth - level - 1);
 	for (int j = 0; j < length; ++j) {
 		for (int i = 0; i < length; ++i) {
-			float avg = input[(length*j+i)*stride];
+			float avg = tree[length*j+i];
 			for (int y = 0; y < 2; ++y)
 				for (int x = 0; x < 2; ++x)
-					input[(pixels+length*2*(j*2+y)+i*2+x)*stride] += avg;
+					tree[pixels+length*2*(j*2+y)+i*2+x] += avg;
 		}
 	}
-	doit(output, input+pixels*stride, stride, level+1, depth, quant);
+	doit(tree+pixels, output, stride, level+1, depth, quant);
 }
 
 int main(int argc, char **argv)
@@ -49,19 +49,18 @@ int main(int argc, char **argv)
 	for (int i = 0; i < 3; ++i)
 		quant[i] = get_vli(bits);
 	int tree_size = (pixels * 4 - 1) / 3;
-	float *input = malloc(sizeof(float) * 3 * tree_size);
+	float *tree = malloc(sizeof(float) * tree_size);
+	struct image *output = new_image(argv[2], length, length);
 	for (int j = 0; j < 3; ++j) {
 		for (int i = 0; i < tree_size; ++i) {
 			float val = get_vli(bits);
 			if (val && get_bit(bits))
 				val = -val;
-			input[j+3*i] = val;
+			tree[i] = val;
 		}
+		doit(tree, output->buffer+j, 3, 0, depth, quant[j]);
 	}
 	close_reader(bits);
-	struct image *output = new_image(argv[2], length, length);
-	for (int i = 0; i < 3; ++i)
-		doit(output->buffer+i, input+i, 3, 0, depth, quant[i]);
 	if (mode)
 		rgb_image(output);
 	if (!write_ppm(output))
