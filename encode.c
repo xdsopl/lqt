@@ -7,6 +7,7 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "ppm.h"
 #include "vli.h"
 #include "bits.h"
+#include "hilbert.h"
 
 void doit(float *tree, float *input, int stride, int level, int depth, int quant)
 {
@@ -88,13 +89,13 @@ int main(int argc, char **argv)
 			int len = 1 << d;
 			int size = len * len;
 			for (int i = 0; i < size; ++i) {
-				if (level[i]) {
-					put_vli(bits, fabsf(level[i]));
-					put_bit(bits, level[i] < 0.f);
+				if (level[hilbert(len, i)]) {
+					put_vli(bits, fabsf(level[hilbert(len, i)]));
+					put_bit(bits, level[hilbert(len, i)] < 0.f);
 				} else {
 					put_vli(bits, 0);
 					int k = i + 1;
-					while (k < size && !level[k])
+					while (k < size && !level[hilbert(len, k)])
 						++k;
 					--k;
 					put_vli(bits, k - i);

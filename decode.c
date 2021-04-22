@@ -7,6 +7,7 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "ppm.h"
 #include "vli.h"
 #include "bits.h"
+#include "hilbert.h"
 
 void doit(float *tree, float *output, int stride, int level, int depth, int quant)
 {
@@ -64,9 +65,9 @@ int main(int argc, char **argv)
 				} else {
 					int cnt = get_vli(bits);
 					for (int k = 0; k < cnt; ++k)
-						level[i++] = 0;
+						level[hilbert(len, i++)] = 0;
 				}
-				level[i] = val;
+				level[hilbert(len, i)] = val;
 			}
 			level += size;
 		}
