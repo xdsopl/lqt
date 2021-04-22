@@ -83,19 +83,25 @@ int main(int argc, char **argv)
 		put_vli(bits, quant[i]);
 	for (int j = 0; j < 3; ++j) {
 		doit(tree, input->buffer+j, 3, 0, depth, quant[j]);
-		for (int i = 0; i < tree_size; ++i) {
-			if (tree[i]) {
-				put_vli(bits, fabsf(tree[i]));
-				put_bit(bits, tree[i] < 0.f);
-			} else {
-				put_vli(bits, 0);
-				int k = i + 1;
-				while (k < tree_size && !tree[k])
-					++k;
-				--k;
-				put_vli(bits, k - i);
-				i = k;
+		float *level = tree;
+		for (int d = 0; d <= depth; ++d) {
+			int len = 1 << d;
+			int size = len * len;
+			for (int i = 0; i < size; ++i) {
+				if (level[i]) {
+					put_vli(bits, fabsf(level[i]));
+					put_bit(bits, level[i] < 0.f);
+				} else {
+					put_vli(bits, 0);
+					int k = i + 1;
+					while (k < size && !level[k])
+						++k;
+					--k;
+					put_vli(bits, k - i);
+					i = k;
+				}
 			}
+			level += size;
 		}
 	}
 	close_writer(bits);

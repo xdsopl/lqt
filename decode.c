@@ -52,17 +52,23 @@ int main(int argc, char **argv)
 	float *tree = malloc(sizeof(float) * tree_size);
 	struct image *output = new_image(argv[2], length, length);
 	for (int j = 0; j < 3; ++j) {
-		for (int i = 0; i < tree_size; ++i) {
-			float val = get_vli(bits);
-			if (val) {
-				if (get_bit(bits))
-					val = -val;
-			} else {
-				int cnt = get_vli(bits);
-				for (int k = 0; k < cnt; ++k)
-					tree[i++] = 0;
+		float *level = tree;
+		for (int d = 0; d <= depth; ++d) {
+			int len = 1 << d;
+			int size = len * len;
+			for (int i = 0; i < size; ++i) {
+				float val = get_vli(bits);
+				if (val) {
+					if (get_bit(bits))
+						val = -val;
+				} else {
+					int cnt = get_vli(bits);
+					for (int k = 0; k < cnt; ++k)
+						level[i++] = 0;
+				}
+				level[i] = val;
 			}
-			tree[i] = val;
+			level += size;
 		}
 		doit(tree, output->buffer+j, 3, 0, depth, quant[j]);
 	}
