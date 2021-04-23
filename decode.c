@@ -53,6 +53,11 @@ int main(int argc, char **argv)
 	float *tree = malloc(sizeof(float) * tree_size);
 	struct image *output = new_image(argv[2], length, length);
 	for (int j = 0; j < 3; ++j) {
+		if (!quant[j]) {
+			for (int i = 0; i < pixels; ++i)
+				output->buffer[3*i+j] = 0;
+			continue;
+		}
 		float *level = tree;
 		for (int d = 0; d <= depth; ++d) {
 			int len = 1 << d;

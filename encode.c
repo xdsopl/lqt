@@ -84,6 +84,8 @@ int main(int argc, char **argv)
 	for (int i = 0; i < 3; ++i)
 		put_vli(bits, quant[i]);
 	for (int j = 0; j < 3; ++j) {
+		if (!quant[j])
+			continue;
 		doit(tree, input->buffer+j, 3, 0, depth, quant[j]);
 		float *level = tree;
 		for (int d = 0; d <= depth; ++d) {
