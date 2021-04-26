@@ -1,5 +1,5 @@
 /*
-Decoder for lossy image compression based on the quadtree data structure
+Decoder for lossless image compression based on the quadtree data structure
 
 Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 */
@@ -9,7 +9,7 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "bits.h"
 #include "hilbert.h"
 
-void doit(float *tree, float *output, int stride, int level, int depth, int quant)
+void doit(int *tree, unsigned char *output, int stride, int level, int depth)
 {
 	int length = 1 << level;
 	int pixels = length * length;
@@ -18,19 +18,15 @@ void doit(float *tree, float *output, int stride, int level, int depth, int quan
 			output[i*stride] = tree[i];
 		return;
 	}
-	if (level == 0)
-		tree[0] /= quant << depth;
-	for (int i = 0; i < 4 * pixels; ++i)
-		tree[pixels+i] /= quant << (depth - level - 1);
 	for (int j = 0; j < length; ++j) {
 		for (int i = 0; i < length; ++i) {
-			float avg = tree[length*j+i];
+			int avg = tree[length*j+i];
 			for (int y = 0; y < 2; ++y)
 				for (int x = 0; x < 2; ++x)
 					tree[pixels+length*2*(j*2+y)+i*2+x] += avg;
 		}
 	}
-	doit(tree+pixels, output, stride, level+1, depth, quant);
+	doit(tree+pixels, output, stride, level+1, depth);
 }
 
 int main(int argc, char **argv)
@@ -42,28 +38,19 @@ int main(int argc, char **argv)
 	struct bits *bits = bits_reader(argv[1]);
 	if (!bits)
 		return 1;
-	int mode = get_bit(bits);
 	int depth = get_vli(bits);
 	int length = 1 << depth;
 	int pixels = length * length;
-	int quant[3];
-	for (int i = 0; i < 3; ++i)
-		quant[i] = get_vli(bits);
 	int tree_size = (pixels * 4 - 1) / 3;
-	float *tree = malloc(sizeof(float) * tree_size);
+	int *tree = malloc(sizeof(int) * tree_size);
 	struct image *output = new_image(argv[2], length, length);
 	for (int j = 0; j < 3; ++j) {
-		if (!quant[j]) {
-			for (int i = 0; i < pixels; ++i)
-				output->buffer[3*i+j] = 0;
-			continue;
-		}
-		float *level = tree;
+		int *level = tree;
 		for (int d = 0; d <= depth; ++d) {
 			int len = 1 << d;
 			int size = len * len;
 			for (int i = 0; i < size; ++i) {
-				float val = get_vli(bits);
+				int val = get_vli(bits);
 				if (val) {
 					if (get_bit(bits))
 						val = -val;
@@ -76,11 +63,9 @@ int main(int argc, char **argv)
 			}
 			level += size;
 		}
-		doit(tree, output->buffer+j, 3, 0, depth, quant[j]);
+		doit(tree, output->buffer+j, 3, 0, depth);
 	}
 	close_reader(bits);
-	if (mode)
-		rgb_image(output);
 	if (!write_ppm(output))
 		return 1;
 	return 0;
