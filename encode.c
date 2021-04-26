@@ -25,7 +25,11 @@ void doit(int *tree, int *input, int stride, int level, int depth)
 			for (int y = 0; y < 2; ++y)
 				for (int x = 0; x < 2; ++x)
 					sum += tree[pixels+length*2*(j*2+y)+i*2+x];
-			int avg = (sum + 2) / 4;
+			if (sum < 0)
+				sum -= 2;
+			else
+				sum += 2;
+			int avg = sum / 4;
 			tree[length*j+i] = avg;
 			for (int y = 0; y < 2; ++y)
 				for (int x = 0; x < 2; ++x)
