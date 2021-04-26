@@ -9,7 +9,7 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "bits.h"
 #include "hilbert.h"
 
-void doit(int *tree, unsigned char *output, int stride, int level, int depth)
+void doit(int *tree, int *output, int stride, int level, int depth)
 {
 	int length = 1 << level;
 	int pixels = length * length;
@@ -38,6 +38,7 @@ int main(int argc, char **argv)
 	struct bits *bits = bits_reader(argv[1]);
 	if (!bits)
 		return 1;
+	int mode = get_bit(bits);
 	int depth = get_vli(bits);
 	int length = 1 << depth;
 	int pixels = length * length;
@@ -66,6 +67,8 @@ int main(int argc, char **argv)
 		doit(tree, output->buffer+j, 3, 0, depth);
 	}
 	close_reader(bits);
+	if (mode)
+		rgb_image(output);
 	if (!write_ppm(output))
 		return 1;
 	return 0;

@@ -9,7 +9,7 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "bits.h"
 #include "hilbert.h"
 
-void doit(int *tree, unsigned char *input, int stride, int level, int depth)
+void doit(int *tree, int *input, int stride, int level, int depth)
 {
 	int length = 1 << level;
 	int pixels = length * length;
@@ -49,13 +49,18 @@ int ilog2(int x)
 
 int main(int argc, char **argv)
 {
-	if (argc != 3) {
-		fprintf(stderr, "usage: %s input.ppm output.lqt\n", argv[0]);
+	if (argc != 3 && argc != 4) {
+		fprintf(stderr, "usage: %s input.ppm output.lqt [MODE]\n", argv[0]);
 		return 1;
 	}
+	int mode = 1;
+	if (argc == 4)
+		mode = atoi(argv[3]);
 	struct image *input = read_ppm(argv[1]);
 	if (!input || input->width != input->height || !pow2(input->width))
 		return 1;
+	if (mode)
+		rct_image(input);
 	int length = input->width;
 	int pixels = length * length;
 	int depth = ilog2(length);
@@ -64,6 +69,7 @@ int main(int argc, char **argv)
 	struct bits *bits = bits_writer(argv[2]);
 	if (!bits)
 		return 1;
+	put_bit(bits, mode);
 	put_vli(bits, depth);
 	int zeros = 0;
 	for (int j = 0; j < 3; ++j) {
