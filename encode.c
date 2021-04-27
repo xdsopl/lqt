@@ -9,16 +9,16 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "bits.h"
 #include "hilbert.h"
 
-void doit(int *tree, int *input, int stride, int level, int depth)
+void doit(int *tree, int *input, int level, int depth)
 {
 	int length = 1 << level;
 	int pixels = length * length;
 	if (level == depth) {
 		for (int i = 0; i < pixels; ++i)
-			tree[i] = input[i*stride];
+			tree[i] = input[i];
 		return;
 	}
-	doit(tree+pixels, input, stride, level+1, depth);
+	doit(tree+pixels, input, level+1, depth);
 	for (int j = 0; j < length; ++j) {
 		for (int i = 0; i < length; ++i) {
 			int sum = 0;
@@ -38,17 +38,14 @@ void doit(int *tree, int *input, int stride, int level, int depth)
 	}
 }
 
-int pow2(int N)
+void copy(int *output, int *input, int width, int height, int length, int stride)
 {
-	return !(N & (N - 1));
-}
-
-int ilog2(int x)
-{
-	int l = -1;
-	for (; x > 0; x /= 2)
-		++l;
-	return l;
+	for (int j = 0; j < length; ++j)
+		for (int i = 0; i < length; ++i)
+			if (j < height && i < width)
+				output[length*j+i] = input[(width*j+i)*stride];
+			else
+				output[length*j+i] = 0;
 }
 
 int main(int argc, char **argv)
@@ -60,24 +57,31 @@ int main(int argc, char **argv)
 	int mode = 1;
 	if (argc == 4)
 		mode = atoi(argv[3]);
-	struct image *input = read_ppm(argv[1]);
-	if (!input || input->width != input->height || !pow2(input->width))
+	struct image *image = read_ppm(argv[1]);
+	if (!image)
 		return 1;
 	if (mode)
-		rct_image(input);
-	int length = input->width;
+		rct_image(image);
+	int width = image->width;
+	int height = image->height;
+	int length = 1;
+	int depth = 0;
+	while (length < width || length < height)
+		length = 1 << ++depth;
 	int pixels = length * length;
-	int depth = ilog2(length);
+	int *input = malloc(sizeof(int) * pixels);
 	int tree_size = (pixels * 4 - 1) / 3;
 	int *tree = malloc(sizeof(int) * tree_size);
 	struct bits *bits = bits_writer(argv[2]);
 	if (!bits)
 		return 1;
 	put_bit(bits, mode);
-	put_vli(bits, depth);
+	put_vli(bits, width);
+	put_vli(bits, height);
 	int zeros = 0;
 	for (int j = 0; j < 3; ++j) {
-		doit(tree, input->buffer+j, 3, 0, depth);
+		copy(input, image->buffer+j, width, height, length, 3);
+		doit(tree, input, 0, depth);
 		int *level = tree;
 		for (int d = 0; d <= depth; ++d) {
 			int len = 1 << d;

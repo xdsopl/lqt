@@ -9,13 +9,13 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "bits.h"
 #include "hilbert.h"
 
-void doit(int *tree, int *output, int stride, int level, int depth)
+void doit(int *tree, int *output, int level, int depth)
 {
 	int length = 1 << level;
 	int pixels = length * length;
 	if (level == depth) {
 		for (int i = 0; i < pixels; ++i)
-			output[i*stride] = tree[i];
+			output[i] = tree[i];
 		return;
 	}
 	for (int j = 0; j < length; ++j) {
@@ -26,7 +26,14 @@ void doit(int *tree, int *output, int stride, int level, int depth)
 					tree[pixels+length*2*(j*2+y)+i*2+x] += avg;
 		}
 	}
-	doit(tree+pixels, output, stride, level+1, depth);
+	doit(tree+pixels, output, level+1, depth);
+}
+
+void copy(int *output, int *input, int width, int height, int length, int stride)
+{
+	for (int j = 0; j < height; ++j)
+		for (int i = 0; i < width; ++i)
+			output[(width*j+i)*stride] = input[length*j+i];
 }
 
 int main(int argc, char **argv)
@@ -39,12 +46,17 @@ int main(int argc, char **argv)
 	if (!bits)
 		return 1;
 	int mode = get_bit(bits);
-	int depth = get_vli(bits);
-	int length = 1 << depth;
+	int width = get_vli(bits);
+	int height = get_vli(bits);
+	int length = 1;
+	int depth = 0;
+	while (length < width || length < height)
+		length = 1 << ++depth;
 	int pixels = length * length;
 	int tree_size = (pixels * 4 - 1) / 3;
 	int *tree = malloc(sizeof(int) * tree_size);
-	struct image *output = new_image(argv[2], length, length);
+	int *output = malloc(sizeof(int) * pixels);
+	struct image *image = new_image(argv[2], width, height);
 	for (int j = 0; j < 3; ++j) {
 		int *level = tree;
 		for (int d = 0; d <= depth; ++d) {
@@ -64,12 +76,13 @@ int main(int argc, char **argv)
 			}
 			level += size;
 		}
-		doit(tree, output->buffer+j, 3, 0, depth);
+		doit(tree, output, 0, depth);
+		copy(image->buffer+j, output, width, height, length, 3);
 	}
 	close_reader(bits);
 	if (mode)
-		rgb_image(output);
-	if (!write_ppm(output))
+		rgb_image(image);
+	if (!write_ppm(image))
 		return 1;
 	return 0;
 }
