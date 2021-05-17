@@ -72,13 +72,13 @@ int main(int argc, char **argv)
 	int *input = malloc(sizeof(int) * pixels);
 	int tree_size = (pixels * 4 - 1) / 3;
 	int *tree = malloc(sizeof(int) * tree_size);
-	struct bits *bits = bits_writer(argv[2]);
+	struct bits_writer *bits = bits_writer(argv[2], 1 << 24);
 	if (!bits)
 		return 1;
 	put_bit(bits, mode);
 	put_vli(bits, width);
 	put_vli(bits, height);
-	int zeros = 0;
+	bits_flush(bits);
 	for (int j = 0; j < 3; ++j) {
 		copy(input, image->buffer+j, width, height, length, 3);
 		doit(tree, input, 0, depth);
@@ -91,7 +91,6 @@ int main(int argc, char **argv)
 					put_vli(bits, abs(level[hilbert(len, i)]));
 					put_bit(bits, level[hilbert(len, i)] < 0);
 				} else {
-					int pos0 = ftell(bits->file) * 8 + bits->cnt;
 					put_vli(bits, 0);
 					int k = i + 1;
 					while (k < size && !level[hilbert(len, k)])
@@ -99,17 +98,19 @@ int main(int argc, char **argv)
 					--k;
 					put_vli(bits, k - i);
 					i = k;
-					int pos1 = ftell(bits->file) * 8 + bits->cnt;
-					zeros += pos1 - pos0;
 				}
 			}
 			level += size;
+			bits_flush(bits);
 		}
 	}
 	free(input);
 	free(tree);
 	delete_image(image);
-	fprintf(stderr, "bits used to encode zeros: %d%%\n", (100 * zeros) / (int)(ftell(bits->file) * 8 + bits->cnt));
+	int cnt = bits_count(bits);
+	int bytes = (cnt + 7) / 8;
+	int kib = (bytes + 512) / 1024;
+	fprintf(stderr, "%d bits (%d KiB) encoded\n", cnt, kib);
 	close_writer(bits);
 	return 0;
 }
