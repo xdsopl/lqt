@@ -48,6 +48,25 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 				output[length*j+i] = 0;
 }
 
+void encode(struct bits_writer *bits, int *level, int len)
+{
+	int size = len * len;
+	for (int i = 0; i < size; ++i) {
+		if (level[hilbert(len, i)]) {
+			put_vli(bits, abs(level[hilbert(len, i)]));
+			put_bit(bits, level[hilbert(len, i)] < 0);
+		} else {
+			put_vli(bits, 0);
+			int k = i + 1;
+			while (k < size && !level[hilbert(len, k)])
+				++k;
+			--k;
+			put_vli(bits, k - i);
+			i = k;
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 3 && argc != 4) {
@@ -79,28 +98,11 @@ int main(int argc, char **argv)
 	put_vli(bits, width);
 	put_vli(bits, height);
 	bits_flush(bits);
-	for (int j = 0; j < 3; ++j) {
-		copy(input, image->buffer+j, width, height, length, 3);
+	for (int chan = 0; chan < 3; ++chan) {
+		copy(input, image->buffer+chan, width, height, length, 3);
 		doit(tree, input, 0, depth);
-		int *level = tree;
-		for (int d = 0; d <= depth; ++d) {
-			int len = 1 << d;
-			int size = len * len;
-			for (int i = 0; i < size; ++i) {
-				if (level[hilbert(len, i)]) {
-					put_vli(bits, abs(level[hilbert(len, i)]));
-					put_bit(bits, level[hilbert(len, i)] < 0);
-				} else {
-					put_vli(bits, 0);
-					int k = i + 1;
-					while (k < size && !level[hilbert(len, k)])
-						++k;
-					--k;
-					put_vli(bits, k - i);
-					i = k;
-				}
-			}
-			level += size;
+		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len * len, len *= 2) {
+			encode(bits, level, len);
 			bits_flush(bits);
 		}
 	}

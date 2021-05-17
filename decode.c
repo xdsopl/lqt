@@ -36,6 +36,23 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 			output[(width*j+i)*stride] = input[length*j+i];
 }
 
+void decode(struct bits_reader *bits, int *level, int len)
+{
+	int size = len * len;
+	for (int i = 0; i < size; ++i) {
+		int val = get_vli(bits);
+		if (val) {
+			if (get_bit(bits))
+				val = -val;
+		} else {
+			int cnt = get_vli(bits);
+			for (int k = 0; k < cnt; ++k)
+				level[hilbert(len, i++)] = 0;
+		}
+		level[hilbert(len, i)] = val;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 3) {
@@ -58,24 +75,8 @@ int main(int argc, char **argv)
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
 	for (int j = 0; j < 3; ++j) {
-		int *level = tree;
-		for (int d = 0; d <= depth; ++d) {
-			int len = 1 << d;
-			int size = len * len;
-			for (int i = 0; i < size; ++i) {
-				int val = get_vli(bits);
-				if (val) {
-					if (get_bit(bits))
-						val = -val;
-				} else {
-					int cnt = get_vli(bits);
-					for (int k = 0; k < cnt; ++k)
-						level[hilbert(len, i++)] = 0;
-				}
-				level[hilbert(len, i)] = val;
-			}
-			level += size;
-		}
+		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len * len, len *= 2)
+			decode(bits, level, len);
 		doit(tree, output, 0, depth);
 		copy(image->buffer+j, output, width, height, length, 3);
 	}
