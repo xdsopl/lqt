@@ -67,14 +67,26 @@ void encode(struct bits_writer *bits, int *level, int len)
 	}
 }
 
+int over_capacity(struct bits_writer *bits, int capacity)
+{
+	int cnt = bits_count(bits);
+	if (cnt > capacity) {
+		bits_discard(bits);
+		fprintf(stderr, "%d bits over capacity, discarding.\n", cnt-capacity);
+		return 1;
+	}
+	bits_flush(bits);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
-	if (argc != 3 && argc != 4) {
-		fprintf(stderr, "usage: %s input.ppm output.lqt [MODE]\n", argv[0]);
+	if (argc != 3 && argc != 4 && argc != 5) {
+		fprintf(stderr, "usage: %s input.ppm output.lqt [MODE] [CAPACITY]\n", argv[0]);
 		return 1;
 	}
 	int mode = 1;
-	if (argc == 4)
+	if (argc >= 4)
 		mode = atoi(argv[3]);
 	struct image *image = read_ppm(argv[1]);
 	if (!image)
@@ -97,7 +109,10 @@ int main(int argc, char **argv)
 	}
 	free(input);
 	delete_image(image);
-	struct bits_writer *bits = bits_writer(argv[2], 1 << 24);
+	int capacity = 1 << 24;
+	if (argc >= 5)
+		capacity = atoi(argv[4]);
+	struct bits_writer *bits = bits_writer(argv[2], capacity);
 	if (!bits)
 		return 1;
 	put_bit(bits, mode);
@@ -105,11 +120,12 @@ int main(int argc, char **argv)
 	put_vli(bits, height);
 	bits_flush(bits);
 	for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2) {
-		for (int chan = 0; chan < 3; ++chan) {
+		for (int chan = 0; chan < 3; ++chan)
 			encode(bits, level+chan*tree_size, len);
-			bits_flush(bits);
-		}
+		if (over_capacity(bits, capacity))
+			goto end;
 	}
+end:
 	free(tree);
 	int cnt = bits_count(bits);
 	int bytes = (cnt + 7) / 8;

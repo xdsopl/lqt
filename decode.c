@@ -86,7 +86,8 @@ int main(int argc, char **argv)
 	for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2)
 		for (int chan = 0; chan < 3; ++chan)
 			if (decode(bits, level+chan*tree_size, len))
-				break;
+				goto end;
+end:;
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
 	for (int chan = 0; chan < 3; ++chan) {
