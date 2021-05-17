@@ -7,6 +7,9 @@ test: encode decode
 	./encode input.ppm putput.lqt
 	./decode putput.lqt output.ppm
 
+%: %.c *.h
+	$(CC) $(CFLAGS) $< $(LDLIBS) -o $@
+
 clean:
 	rm -f encode decode
 
