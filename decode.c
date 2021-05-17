@@ -36,28 +36,26 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 			output[(width*j+i)*stride] = input[length*j+i];
 }
 
-int decode(struct bits_reader *bits, int *level, int len)
+int decode(struct bits_reader *bits, int *level, int len, int plane)
 {
+	int ret = get_vli(bits);
+	if (ret < 0)
+		return ret;
 	int size = len * len;
-	for (int i = 0; i < size; ++i) {
-		int val = get_vli(bits);
-		if (val < 0) {
-			return val;
-		} else if (val) {
-			int sgn = get_bit(bits);
-			if (sgn < 0)
-				return sgn;
-			if (sgn)
-				val = -val;
-			level[hilbert(len, i)] = val;
-		} else {
-			int cnt = get_vli(bits);
-			if (cnt < 0)
-				return cnt;
-			i += cnt;
-		}
+	for (int i = ret; i < size; i += ret + 1) {
+		level[hilbert(len, i)] |= 1 << plane;
+		if ((ret = get_vli(bits)) < 0)
+			return ret;
 	}
 	return 0;
+}
+
+void finalize(int *val, int num, int planes)
+{
+	int mask = 1 << (planes-1);
+	for (int i = 0; i < num; ++i)
+		if (val[i] & mask)
+			val[i] = -(val[i]^mask);
 }
 
 int main(int argc, char **argv)
@@ -83,11 +81,14 @@ int main(int argc, char **argv)
 	int *tree = malloc(sizeof(int) * 3 * tree_size);
 	for (int i = 0; i < 3 * tree_size; ++i)
 		tree[i] = 0;
-	for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2)
-		for (int chan = 0; chan < 3; ++chan)
-			if (decode(bits, level+chan*tree_size, len))
-				goto end;
-end:;
+	int planes = 8 + mode;
+	for (int plane = planes-1; plane >= 0; --plane)
+		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2)
+			for (int chan = 0; chan < 3; ++chan)
+				if (decode(bits, level+chan*tree_size, len, plane))
+					goto end;
+end:
+	finalize(tree, 3 * tree_size, planes);
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
 	for (int chan = 0; chan < 3; ++chan) {

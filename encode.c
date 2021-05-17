@@ -48,23 +48,18 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 				output[length*j+i] = 0;
 }
 
-void encode(struct bits_writer *bits, int *level, int len)
+void encode(struct bits_writer *bits, int *level, int len, int plane, int planes)
 {
-	int size = len * len;
+	int size = len * len, mask = 1 << plane, last = 0;
 	for (int i = 0; i < size; ++i) {
-		if (level[hilbert(len, i)]) {
-			put_vli(bits, abs(level[hilbert(len, i)]));
-			put_bit(bits, level[hilbert(len, i)] < 0);
-		} else {
-			put_vli(bits, 0);
-			int k = i + 1;
-			while (k < size && !level[hilbert(len, k)])
-				++k;
-			--k;
-			put_vli(bits, k - i);
-			i = k;
+		if (level[hilbert(len, i)] & mask) {
+			if (plane == planes-1)
+				level[hilbert(len, i)] = -level[hilbert(len, i)];
+			put_vli(bits, i - last);
+			last = i + 1;
 		}
 	}
+	put_vli(bits, size - last);
 }
 
 int over_capacity(struct bits_writer *bits, int capacity)
@@ -119,11 +114,14 @@ int main(int argc, char **argv)
 	put_vli(bits, width);
 	put_vli(bits, height);
 	bits_flush(bits);
-	for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2) {
-		for (int chan = 0; chan < 3; ++chan)
-			encode(bits, level+chan*tree_size, len);
-		if (over_capacity(bits, capacity))
-			goto end;
+	int planes = 8 + mode;
+	for (int plane = planes-1; plane >= 0; --plane) {
+		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2) {
+			for (int chan = 0; chan < 3; ++chan)
+				encode(bits, level+chan*tree_size, len, plane, planes);
+			if (over_capacity(bits, capacity))
+				goto end;
+		}
 	}
 end:
 	free(tree);
