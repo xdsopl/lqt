@@ -49,14 +49,13 @@ int decode(struct bits_reader *bits, int *level, int len)
 				return sgn;
 			if (sgn)
 				val = -val;
+			level[hilbert(len, i)] = val;
 		} else {
 			int cnt = get_vli(bits);
 			if (cnt < 0)
 				return cnt;
-			for (int k = 0; k < cnt; ++k)
-				level[hilbert(len, i++)] = 0;
+			i += cnt;
 		}
-		level[hilbert(len, i)] = val;
 	}
 	return 0;
 }
@@ -82,6 +81,8 @@ int main(int argc, char **argv)
 	int pixels = length * length;
 	int tree_size = (pixels * 4 - 1) / 3;
 	int *tree = malloc(sizeof(int) * 3 * tree_size);
+	for (int i = 0; i < 3 * tree_size; ++i)
+		tree[i] = 0;
 	for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2)
 		for (int chan = 0; chan < 3; ++chan)
 			if (decode(bits, level+chan*tree_size, len))
