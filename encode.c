@@ -90,7 +90,13 @@ int main(int argc, char **argv)
 	int pixels = length * length;
 	int *input = malloc(sizeof(int) * pixels);
 	int tree_size = (pixels * 4 - 1) / 3;
-	int *tree = malloc(sizeof(int) * tree_size);
+	int *tree = malloc(sizeof(int) * 3 * tree_size);
+	for (int chan = 0; chan < 3; ++chan) {
+		copy(input, image->buffer+chan, width, height, length, 3);
+		doit(tree+chan*tree_size, input, 0, depth);
+	}
+	free(input);
+	delete_image(image);
 	struct bits_writer *bits = bits_writer(argv[2], 1 << 24);
 	if (!bits)
 		return 1;
@@ -98,17 +104,13 @@ int main(int argc, char **argv)
 	put_vli(bits, width);
 	put_vli(bits, height);
 	bits_flush(bits);
-	for (int chan = 0; chan < 3; ++chan) {
-		copy(input, image->buffer+chan, width, height, length, 3);
-		doit(tree, input, 0, depth);
-		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len * len, len *= 2) {
-			encode(bits, level, len);
+	for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2) {
+		for (int chan = 0; chan < 3; ++chan) {
+			encode(bits, level+chan*tree_size, len);
 			bits_flush(bits);
 		}
 	}
-	free(input);
 	free(tree);
-	delete_image(image);
 	int cnt = bits_count(bits);
 	int bytes = (cnt + 7) / 8;
 	int kib = (bytes + 512) / 1024;

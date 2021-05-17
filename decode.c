@@ -81,18 +81,19 @@ int main(int argc, char **argv)
 		length = 1 << ++depth;
 	int pixels = length * length;
 	int tree_size = (pixels * 4 - 1) / 3;
-	int *tree = malloc(sizeof(int) * tree_size);
+	int *tree = malloc(sizeof(int) * 3 * tree_size);
+	for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2)
+		for (int chan = 0; chan < 3; ++chan)
+			if (decode(bits, level+chan*tree_size, len))
+				break;
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
-	for (int j = 0; j < 3; ++j) {
-		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len * len, len *= 2)
-			if (decode(bits, level, len))
-				break;
-		doit(tree, output, 0, depth);
-		copy(image->buffer+j, output, width, height, length, 3);
+	for (int chan = 0; chan < 3; ++chan) {
+		doit(tree+chan*tree_size, output, 0, depth);
+		copy(image->buffer+chan, output, width, height, length, 3);
 	}
-	free(output);
 	free(tree);
+	free(output);
 	close_reader(bits);
 	if (mode)
 		rgb_image(image);
