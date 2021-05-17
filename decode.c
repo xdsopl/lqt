@@ -79,11 +79,14 @@ int main(int argc, char **argv)
 		doit(tree, output, 0, depth);
 		copy(image->buffer+j, output, width, height, length, 3);
 	}
+	free(output);
+	free(tree);
 	close_reader(bits);
 	if (mode)
 		rgb_image(image);
 	if (!write_ppm(image))
 		return 1;
+	delete_image(image);
 	return 0;
 }
 

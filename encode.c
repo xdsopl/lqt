@@ -106,6 +106,9 @@ int main(int argc, char **argv)
 			level += size;
 		}
 	}
+	free(input);
+	free(tree);
+	delete_image(image);
 	fprintf(stderr, "bits used to encode zeros: %d%%\n", (100 * zeros) / (int)(ftell(bits->file) * 8 + bits->cnt));
 	close_writer(bits);
 	return 0;
