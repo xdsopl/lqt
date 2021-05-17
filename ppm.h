@@ -75,6 +75,11 @@ eof:
 	return 0;
 }
 
+int clamp(int x, int a, int b)
+{
+	return x < a ? a : x > b ? b : x;
+}
+
 int write_ppm(struct image *image)
 {
 	FILE *file = fopen(image->name, "w");
@@ -88,7 +93,7 @@ int write_ppm(struct image *image)
 		return 0;
 	}
 	for (int i = 0; i < 3 * image->total; i++) {
-		if (EOF == fputc(image->buffer[i], file))
+		if (EOF == fputc(clamp(image->buffer[i], 0, 255), file))
 			goto eof;
 	}
 	fclose(file);
