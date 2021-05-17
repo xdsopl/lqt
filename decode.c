@@ -36,21 +36,29 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 			output[(width*j+i)*stride] = input[length*j+i];
 }
 
-void decode(struct bits_reader *bits, int *level, int len)
+int decode(struct bits_reader *bits, int *level, int len)
 {
 	int size = len * len;
 	for (int i = 0; i < size; ++i) {
 		int val = get_vli(bits);
-		if (val) {
-			if (get_bit(bits))
+		if (val < 0) {
+			return val;
+		} else if (val) {
+			int sgn = get_bit(bits);
+			if (sgn < 0)
+				return sgn;
+			if (sgn)
 				val = -val;
 		} else {
 			int cnt = get_vli(bits);
+			if (cnt < 0)
+				return cnt;
 			for (int k = 0; k < cnt; ++k)
 				level[hilbert(len, i++)] = 0;
 		}
 		level[hilbert(len, i)] = val;
 	}
+	return 0;
 }
 
 int main(int argc, char **argv)
@@ -65,6 +73,8 @@ int main(int argc, char **argv)
 	int mode = get_bit(bits);
 	int width = get_vli(bits);
 	int height = get_vli(bits);
+	if ((mode|width|height) < 0)
+		return 1;
 	int length = 1;
 	int depth = 0;
 	while (length < width || length < height)
@@ -76,7 +86,8 @@ int main(int argc, char **argv)
 	struct image *image = new_image(argv[2], width, height);
 	for (int j = 0; j < 3; ++j) {
 		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len * len, len *= 2)
-			decode(bits, level, len);
+			if (decode(bits, level, len))
+				break;
 		doit(tree, output, 0, depth);
 		copy(image->buffer+j, output, width, height, length, 3);
 	}
