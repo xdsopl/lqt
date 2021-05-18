@@ -80,7 +80,8 @@ int main(int argc, char **argv)
 	int mode = get_bit(bits);
 	int width = get_vli(bits);
 	int height = get_vli(bits);
-	if ((mode|width|height) < 0)
+	int planes = get_vli(bits);
+	if ((mode|width|height|planes) < 0)
 		return 1;
 	int length = 1;
 	int depth = 0;
@@ -91,7 +92,6 @@ int main(int argc, char **argv)
 	int *tree = malloc(sizeof(int) * 3 * tree_size);
 	for (int i = 0; i < 3 * tree_size; ++i)
 		tree[i] = 0;
-	int planes = 8 + mode;
 	int maximum = depth > planes ? depth : planes;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {

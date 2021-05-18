@@ -72,6 +72,23 @@ void encode(struct bits_writer *bits, int *level, int len, int plane, int planes
 	put_vli(bits, size - last);
 }
 
+int ilog2(int x)
+{
+	int l = -1;
+	for (; x > 0; x /= 2)
+		++l;
+	return l;
+}
+
+int count_planes(int *val, int num)
+{
+	int max = 0;
+	for (int i = 0; i < num; ++i)
+		if (max < abs(val[i]))
+			max = abs(val[i]);
+	return 2 + ilog2(max);
+}
+
 int over_capacity(struct bits_writer *bits, int capacity)
 {
 	int cnt = bits_count(bits);
@@ -113,6 +130,7 @@ int main(int argc, char **argv)
 		doit(tree+chan*tree_size, input, 0, depth);
 		reorder(tree+chan*tree_size, input, length);
 	}
+	int planes = count_planes(tree, 3 * tree_size);
 	free(input);
 	delete_image(image);
 	int capacity = 1 << 24;
@@ -124,8 +142,8 @@ int main(int argc, char **argv)
 	put_bit(bits, mode);
 	put_vli(bits, width);
 	put_vli(bits, height);
+	put_vli(bits, planes);
 	bits_flush(bits);
-	int planes = 8 + mode;
 	int maximum = depth > planes ? depth : planes;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
