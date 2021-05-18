@@ -48,13 +48,23 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 				output[length*j+i] = 0;
 }
 
+void reorder(int *tree, int *buffer, int length)
+{
+	for (int len = 1, size = 1, *level = tree; len <= length; level += size, len *= 2, size = len*len) {
+		for (int i = 0; i < size; ++i)
+			buffer[i] = level[i];
+		for (int i = 0; i < size; ++i)
+			level[i] = buffer[hilbert(len, i)];
+	}
+}
+
 void encode(struct bits_writer *bits, int *level, int len, int plane, int planes)
 {
 	int size = len * len, mask = 1 << plane, last = 0;
 	for (int i = 0; i < size; ++i) {
-		if (level[hilbert(len, i)] & mask) {
+		if (level[i] & mask) {
 			if (plane == planes-1)
-				level[hilbert(len, i)] = -level[hilbert(len, i)];
+				level[i] = -level[i];
 			put_vli(bits, i - last);
 			last = i + 1;
 		}
@@ -101,6 +111,7 @@ int main(int argc, char **argv)
 	for (int chan = 0; chan < 3; ++chan) {
 		copy(input, image->buffer+chan, width, height, length, 3);
 		doit(tree+chan*tree_size, input, 0, depth);
+		reorder(tree+chan*tree_size, input, length);
 	}
 	free(input);
 	delete_image(image);

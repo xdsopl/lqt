@@ -36,6 +36,16 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 			output[(width*j+i)*stride] = input[length*j+i];
 }
 
+void reorder(int *tree, int *buffer, int length)
+{
+	for (int len = 1, size = 1, *level = tree; len <= length; level += size, len *= 2, size = len*len) {
+		for (int i = 0; i < size; ++i)
+			buffer[i] = level[i];
+		for (int i = 0; i < size; ++i)
+			level[hilbert(len, i)] = buffer[i];
+	}
+}
+
 int decode(struct bits_reader *bits, int *level, int len, int plane)
 {
 	int ret = get_vli(bits);
@@ -43,7 +53,7 @@ int decode(struct bits_reader *bits, int *level, int len, int plane)
 		return ret;
 	int size = len * len;
 	for (int i = ret; i < size; i += ret + 1) {
-		level[hilbert(len, i)] |= 1 << plane;
+		level[i] |= 1 << plane;
 		if ((ret = get_vli(bits)) < 0)
 			return ret;
 	}
@@ -92,6 +102,7 @@ end:
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
 	for (int chan = 0; chan < 3; ++chan) {
+		reorder(tree+chan*tree_size, output, length);
 		doit(tree+chan*tree_size, output, 0, depth);
 		copy(image->buffer+chan, output, width, height, length, 3);
 	}
