@@ -92,11 +92,18 @@ int main(int argc, char **argv)
 	for (int i = 0; i < 3 * tree_size; ++i)
 		tree[i] = 0;
 	int planes = 8 + mode;
-	for (int plane = planes-1; plane >= 0; --plane)
-		for (int d = 0, len = 1, *level = tree; d <= depth; ++d, level += len*len, len *= 2)
+	int maximum = depth > planes ? depth : planes;
+	int layers_max = 2 * maximum - 1;
+	for (int layers = 0; layers < layers_max; ++layers) {
+		for (int layer = 0, len = 1, *level = tree; len <= length; level += len*len, len *= 2, ++layer) {
+			int plane = planes-1 - (layers-layer);
+			if (plane < 0 || plane >= planes)
+				continue;
 			for (int chan = 0; chan < 3; ++chan)
 				if (decode(bits, level+chan*tree_size, len, plane))
 					goto end;
+		}
+	}
 end:
 	finalize(tree, 3 * tree_size, planes);
 	int *output = malloc(sizeof(int) * pixels);
