@@ -46,12 +46,11 @@ void reorder(int *tree, int *buffer, int length)
 	}
 }
 
-int decode(struct bits_reader *bits, int *level, int len, int plane)
+int decode(struct bits_reader *bits, int *level, int size, int plane)
 {
 	int ret = get_vli(bits);
 	if (ret < 0)
 		return ret;
-	int size = len * len;
 	for (int i = ret; i < size; i += ret + 1) {
 		level[i] |= 1 << plane;
 		if ((ret = get_vli(bits)) < 0)
@@ -118,7 +117,7 @@ int main(int argc, char **argv)
 			if (plane < 0 || plane >= planes)
 				continue;
 			for (int chan = 0; chan < 3; ++chan)
-				if (decode(bits, level+chan*tree_size, len, plane))
+				if (decode(bits, level+chan*tree_size, len*len, plane))
 					goto end;
 		}
 	}

@@ -58,9 +58,9 @@ void reorder(int *tree, int *buffer, int length)
 	}
 }
 
-void encode(struct bits_writer *bits, int *level, int len, int plane, int planes)
+void encode(struct bits_writer *bits, int *level, int size, int plane, int planes)
 {
-	int size = len * len, mask = 1 << plane, last = 0;
+	int mask = 1 << plane, last = 0;
 	for (int i = 0; i < size; ++i) {
 		if (level[i] & mask) {
 			if (plane == planes-1)
@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 			if (plane < 0 || plane >= planes)
 				continue;
 			for (int chan = 0; chan < 3; ++chan)
-				encode(bits, level+chan*tree_size, len, plane, planes);
+				encode(bits, level+chan*tree_size, len*len, plane, planes);
 			if (over_capacity(bits, capacity))
 				goto end;
 		}
