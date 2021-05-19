@@ -7,7 +7,6 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "ppm.h"
 #include "vli.h"
 #include "bits.h"
-#include "hilbert.h"
 
 void doit(int *tree, int *input, int level, int depth)
 {
@@ -48,14 +47,22 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 				output[length*j+i] = 0;
 }
 
-void reorder(int *tree, int *buffer, int length)
+void traverse(int **output, int *input, int level, int depth, int row, int col)
 {
-	for (int len = 2, size = 4, *level = tree+1; len <= length; level += size, len *= 2, size = len*len) {
-		for (int i = 0; i < size; ++i)
-			buffer[i] = level[i];
-		for (int i = 0; i < size; ++i)
-			level[i] = buffer[hilbert(len, i)];
-	}
+	int length = 1 << level;
+	int pixels = length * length;
+	*(*output)++ = input[length*row+col];
+	if (level == depth)
+		return;
+	traverse(output, input+pixels, level+1, depth, row*2+0, col*2+0);
+	traverse(output, input+pixels, level+1, depth, row*2+0, col*2+1);
+	traverse(output, input+pixels, level+1, depth, row*2+1, col*2+0);
+	traverse(output, input+pixels, level+1, depth, row*2+1, col*2+1);
+}
+
+void reorder(int *output, int *input, int depth)
+{
+	traverse(&output, input, 0, depth, 0, 0);
 }
 
 void encode(struct bits_writer *bits, int *level, int size, int plane, int planes)
@@ -138,11 +145,13 @@ int main(int argc, char **argv)
 	int *input = malloc(sizeof(int) * pixels);
 	int tree_size = (pixels * 4 - 1) / 3;
 	int *tree = malloc(sizeof(int) * 3 * tree_size);
+	int *temp = malloc(sizeof(int) * tree_size);
 	for (int chan = 0; chan < 3; ++chan) {
 		copy(input, image->buffer+chan, width, height, length, 3);
-		doit(tree+chan*tree_size, input, 0, depth);
-		reorder(tree+chan*tree_size, input, length);
+		doit(temp, input, 0, depth);
+		reorder(tree+chan*tree_size, temp, depth);
 	}
+	free(temp);
 	int planes = 0;
 	for (int chan = 0; chan < 3; ++chan) {
 		int cnt = count_planes(tree+chan*tree_size+1, tree_size-1);
@@ -164,18 +173,11 @@ int main(int argc, char **argv)
 	for (int chan = 0; chan < 3; ++chan)
 		encode_root(bits, tree+chan*tree_size);
 	bits_flush(bits);
-	int maximum = depth > planes ? depth : planes;
-	int layers_max = 2 * maximum - 1;
-	for (int layers = 0; layers < layers_max; ++layers) {
-		for (int layer = 0, len = 2, *level = tree+1; len <= length && layer <= layers; level += len*len, len *= 2, ++layer) {
-			int plane = planes-1 - (layers-layer);
-			if (plane < 0 || plane >= planes)
-				continue;
-			for (int chan = 0; chan < 3; ++chan)
-				encode(bits, level+chan*tree_size, len*len, plane, planes);
-			if (over_capacity(bits, capacity))
-				goto end;
-		}
+	for (int plane = planes-1; plane >= 0; --plane) {
+		for (int chan = 0; chan < 3; ++chan)
+			encode(bits, tree+chan*tree_size+1, tree_size-1, plane, planes);
+		if (over_capacity(bits, capacity))
+			goto end;
 	}
 end:
 	free(tree);

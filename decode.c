@@ -7,7 +7,6 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 #include "ppm.h"
 #include "vli.h"
 #include "bits.h"
-#include "hilbert.h"
 
 void doit(int *tree, int *output, int level, int depth)
 {
@@ -36,14 +35,22 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 			output[(width*j+i)*stride] = input[length*j+i];
 }
 
-void reorder(int *tree, int *buffer, int length)
+void traverse(int *output, int **input, int level, int depth, int row, int col)
 {
-	for (int len = 2, size = 4, *level = tree+1; len <= length; level += size, len *= 2, size = len*len) {
-		for (int i = 0; i < size; ++i)
-			buffer[i] = level[i];
-		for (int i = 0; i < size; ++i)
-			level[hilbert(len, i)] = buffer[i];
-	}
+	int length = 1 << level;
+	int pixels = length * length;
+	output[length*row+col] = *(*input)++;
+	if (level == depth)
+		return;
+	traverse(output+pixels, input, level+1, depth, row*2+0, col*2+0);
+	traverse(output+pixels, input, level+1, depth, row*2+0, col*2+1);
+	traverse(output+pixels, input, level+1, depth, row*2+1, col*2+0);
+	traverse(output+pixels, input, level+1, depth, row*2+1, col*2+1);
+}
+
+void reorder(int *output, int *input, int depth)
+{
+	traverse(output, &input, 0, depth, 0, 0);
 }
 
 int decode(struct bits_reader *bits, int *level, int size, int plane)
@@ -109,28 +116,22 @@ int main(int argc, char **argv)
 	for (int chan = 0; chan < 3; ++chan)
 		if (decode_root(bits, tree+chan*tree_size))
 			return 1;
-	int maximum = depth > planes ? depth : planes;
-	int layers_max = 2 * maximum - 1;
-	for (int layers = 0; layers < layers_max; ++layers) {
-		for (int layer = 0, len = 2, *level = tree+1; len <= length; level += len*len, len *= 2, ++layer) {
-			int plane = planes-1 - (layers-layer);
-			if (plane < 0 || plane >= planes)
-				continue;
-			for (int chan = 0; chan < 3; ++chan)
-				if (decode(bits, level+chan*tree_size, len*len, plane))
-					goto end;
-		}
-	}
+	for (int plane = planes-1; plane >= 0; --plane)
+		for (int chan = 0; chan < 3; ++chan)
+			if (decode(bits, tree+chan*tree_size+1, tree_size-1, plane))
+				goto end;
 end:
 	for (int chan = 0; chan < 3; ++chan)
 		finalize(tree+chan*tree_size+1, tree_size-1, planes);
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
+	int *temp = malloc(sizeof(int) * tree_size);
 	for (int chan = 0; chan < 3; ++chan) {
-		reorder(tree+chan*tree_size, output, length);
-		doit(tree+chan*tree_size, output, 0, depth);
+		reorder(temp, tree+chan*tree_size, depth);
+		doit(temp, output, 0, depth);
 		copy(image->buffer+chan, output, width, height, length, 3);
 	}
+	free(temp);
 	free(tree);
 	free(output);
 	close_reader(bits);
