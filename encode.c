@@ -50,7 +50,7 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 
 void reorder(int *tree, int *buffer, int length)
 {
-	for (int len = 1, size = 1, *level = tree; len <= length; level += size, len *= 2, size = len*len) {
+	for (int len = 2, size = 4, *level = tree+1; len <= length; level += size, len *= 2, size = len*len) {
 		for (int i = 0; i < size; ++i)
 			buffer[i] = level[i];
 		for (int i = 0; i < size; ++i)
@@ -70,6 +70,13 @@ void encode(struct bits_writer *bits, int *level, int len, int plane, int planes
 		}
 	}
 	put_vli(bits, size - last);
+}
+
+void encode_root(struct bits_writer *bits, int *root)
+{
+	put_vli(bits, abs(*root));
+	if (*root)
+		put_bit(bits, *root < 0);
 }
 
 int ilog2(int x)
@@ -136,7 +143,12 @@ int main(int argc, char **argv)
 		doit(tree+chan*tree_size, input, 0, depth);
 		reorder(tree+chan*tree_size, input, length);
 	}
-	int planes = count_planes(tree, 3 * tree_size);
+	int planes = 0;
+	for (int chan = 0; chan < 3; ++chan) {
+		int cnt = count_planes(tree+chan*tree_size+1, tree_size-1);
+		if (planes < cnt)
+			planes = cnt;
+	}
 	free(input);
 	delete_image(image);
 	int capacity = 1 << 24;
@@ -149,11 +161,13 @@ int main(int argc, char **argv)
 	put_vli(bits, width);
 	put_vli(bits, height);
 	put_vli(bits, planes);
+	for (int chan = 0; chan < 3; ++chan)
+		encode_root(bits, tree+chan*tree_size);
 	bits_flush(bits);
 	int maximum = depth > planes ? depth : planes;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
-		for (int layer = 0, len = 1, *level = tree; len <= length && layer <= layers; level += len*len, len *= 2, ++layer) {
+		for (int layer = 0, len = 2, *level = tree+1; len <= length && layer <= layers; level += len*len, len *= 2, ++layer) {
 			int plane = planes-1 - (layers-layer);
 			if (plane < 0 || plane >= planes)
 				continue;

@@ -38,7 +38,7 @@ void copy(int *output, int *input, int width, int height, int length, int stride
 
 void reorder(int *tree, int *buffer, int length)
 {
-	for (int len = 1, size = 1, *level = tree; len <= length; level += size, len *= 2, size = len*len) {
+	for (int len = 2, size = 4, *level = tree+1; len <= length; level += size, len *= 2, size = len*len) {
 		for (int i = 0; i < size; ++i)
 			buffer[i] = level[i];
 		for (int i = 0; i < size; ++i)
@@ -57,6 +57,21 @@ int decode(struct bits_reader *bits, int *level, int len, int plane)
 		if ((ret = get_vli(bits)) < 0)
 			return ret;
 	}
+	return 0;
+}
+
+int decode_root(struct bits_reader *bits, int *root)
+{
+	int ret = get_vli(bits);
+	if (ret < 0)
+		return ret;
+	*root = ret;
+	if (!ret)
+		return 0;
+	if ((ret = get_bit(bits)) < 0)
+		return ret;
+	if (ret)
+		*root = - *root;
 	return 0;
 }
 
@@ -92,10 +107,13 @@ int main(int argc, char **argv)
 	int *tree = malloc(sizeof(int) * 3 * tree_size);
 	for (int i = 0; i < 3 * tree_size; ++i)
 		tree[i] = 0;
+	for (int chan = 0; chan < 3; ++chan)
+		if (decode_root(bits, tree+chan*tree_size))
+			return 1;
 	int maximum = depth > planes ? depth : planes;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
-		for (int layer = 0, len = 1, *level = tree; len <= length; level += len*len, len *= 2, ++layer) {
+		for (int layer = 0, len = 2, *level = tree+1; len <= length; level += len*len, len *= 2, ++layer) {
 			int plane = planes-1 - (layers-layer);
 			if (plane < 0 || plane >= planes)
 				continue;
@@ -105,7 +123,8 @@ int main(int argc, char **argv)
 		}
 	}
 end:
-	finalize(tree, 3 * tree_size, planes);
+	for (int chan = 0; chan < 3; ++chan)
+		finalize(tree+chan*tree_size+1, tree_size-1, planes);
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
 	for (int chan = 0; chan < 3; ++chan) {
