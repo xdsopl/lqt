@@ -113,8 +113,6 @@ int main(int argc, char **argv)
 	struct image *image = read_ppm(argv[1]);
 	if (!image)
 		return 1;
-	if (mode)
-		rct_image(image);
 	int width = image->width;
 	int height = image->height;
 	int length = 1;
@@ -122,6 +120,14 @@ int main(int argc, char **argv)
 	while (length < width || length < height)
 		length = 1 << ++depth;
 	int pixels = length * length;
+	if (mode) {
+		rct_image(image);
+		for (int i = 0; i < width * height; ++i)
+			image->buffer[3*i] -= 128;
+	} else {
+		for (int i = 0; i < 3 * width * height; ++i)
+			image->buffer[i] -= 128;
+	}
 	int *input = malloc(sizeof(int) * pixels);
 	int tree_size = (pixels * 4 - 1) / 3;
 	int *tree = malloc(sizeof(int) * 3 * tree_size);

@@ -116,8 +116,14 @@ end:
 	free(tree);
 	free(output);
 	close_reader(bits);
-	if (mode)
+	if (mode) {
+		for (int i = 0; i < width * height; ++i)
+			image->buffer[3*i] += 128;
 		rgb_image(image);
+	} else {
+		for (int i = 0; i < 3 * width * height; ++i)
+			image->buffer[i] += 128;
+	}
 	if (!write_ppm(image))
 		return 1;
 	delete_image(image);
