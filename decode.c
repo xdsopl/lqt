@@ -5,6 +5,7 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 */
 
 #include "ppm.h"
+#include "rle.h"
 #include "vli.h"
 #include "bits.h"
 #include "hilbert.h"
@@ -46,15 +47,13 @@ void reorder(int *tree, int *buffer, int length)
 	}
 }
 
-int decode(struct bits_reader *bits, int *level, int size, int plane)
+int decode(struct rle_reader *rle, int *level, int size, int plane)
 {
-	int ret = get_vli(bits);
-	if (ret < 0)
-		return ret;
-	for (int i = ret; i < size; i += ret + 1) {
-		level[i] |= 1 << plane;
-		if ((ret = get_vli(bits)) < 0)
-			return ret;
+	for (int i = 0; i < size; ++i) {
+		int val = get_rle(rle);
+		if (val < 0)
+			return val;
+		level[i] |= val << plane;
 	}
 	return 0;
 }
@@ -109,6 +108,7 @@ int main(int argc, char **argv)
 	for (int chan = 0; chan < 3; ++chan)
 		if (decode_root(bits, tree+chan*tree_size))
 			return 1;
+	struct rle_reader *rle = rle_reader(bits);
 	int maximum = depth > planes ? depth : planes;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
@@ -116,12 +116,16 @@ int main(int argc, char **argv)
 			int plane = planes-1 - (layers-layer);
 			if (plane < 0 || plane >= planes)
 				continue;
+			if (rle_start(rle))
+				goto end;
 			for (int chan = 0; chan < 3; ++chan)
-				if (decode(bits, level+chan*tree_size, len*len, plane))
+				if (decode(rle, level+chan*tree_size, len*len, plane))
 					goto end;
 		}
 	}
 end:
+	delete_reader(rle);
+	close_reader(bits);
 	for (int chan = 0; chan < 3; ++chan)
 		finalize(tree+chan*tree_size+1, tree_size-1, planes);
 	int *output = malloc(sizeof(int) * pixels);
@@ -133,7 +137,6 @@ end:
 	}
 	free(tree);
 	free(output);
-	close_reader(bits);
 	if (mode) {
 		for (int i = 0; i < width * height; ++i)
 			image->buffer[3*i] += 128;

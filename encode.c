@@ -5,6 +5,7 @@ Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 */
 
 #include "ppm.h"
+#include "rle.h"
 #include "vli.h"
 #include "bits.h"
 #include "hilbert.h"
@@ -58,18 +59,15 @@ void reorder(int *tree, int *buffer, int length)
 	}
 }
 
-void encode(struct bits_writer *bits, int *level, int size, int plane, int planes)
+void encode(struct rle_writer *rle, int *level, int size, int plane, int planes)
 {
-	int mask = 1 << plane, last = 0;
+	int mask = 1 << plane;
 	for (int i = 0; i < size; ++i) {
-		if (level[i] & mask) {
-			if (plane == planes-1)
-				level[i] = -level[i];
-			put_vli(bits, i - last);
-			last = i + 1;
-		}
+		int val = level[i] & mask;
+		put_rle(rle, val);
+		if (val && plane == planes-1)
+			level[i] = -level[i];
 	}
-	put_vli(bits, size - last);
 }
 
 void encode_root(struct bits_writer *bits, int *root)
@@ -164,6 +162,7 @@ int main(int argc, char **argv)
 	for (int chan = 0; chan < 3; ++chan)
 		encode_root(bits, tree+chan*tree_size);
 	bits_flush(bits);
+	struct rle_writer *rle = rle_writer(bits);
 	int maximum = depth > planes ? depth : planes;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
@@ -172,12 +171,14 @@ int main(int argc, char **argv)
 			if (plane < 0 || plane >= planes)
 				continue;
 			for (int chan = 0; chan < 3; ++chan)
-				encode(bits, level+chan*tree_size, len*len, plane, planes);
+				encode(rle, level+chan*tree_size, len*len, plane, planes);
+			rle_flush(rle);
 			if (over_capacity(bits, capacity))
 				goto end;
 		}
 	}
 end:
+	delete_writer(rle);
 	free(tree);
 	int cnt = bits_count(bits);
 	int bytes = (cnt + 7) / 8;
