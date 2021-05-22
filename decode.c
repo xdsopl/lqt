@@ -93,8 +93,7 @@ int main(int argc, char **argv)
 	int mode = get_bit(bits);
 	int width = get_vli(bits);
 	int height = get_vli(bits);
-	int planes = get_vli(bits);
-	if ((mode|width|height|planes) < 0)
+	if ((mode|width|height) < 0)
 		return 1;
 	int length = 1;
 	int depth = 0;
@@ -108,26 +107,35 @@ int main(int argc, char **argv)
 	for (int chan = 0; chan < 3; ++chan)
 		if (decode_root(bits, tree+chan*tree_size))
 			return 1;
+	int planes[3];
+	for (int chan = 0; chan < 3; ++chan)
+		if ((planes[chan] = get_vli(bits)) < 0)
+			return 1;
 	struct rle_reader *rle = rle_reader(bits);
 	if (rle_start(rle))
 		goto end;
-	int maximum = depth > planes ? depth : planes;
+	int planes_max = 0;
+	for (int chan = 0; chan < 3; ++chan)
+		if (planes_max < planes[chan])
+			planes_max = planes[chan];
+	int maximum = depth > planes_max ? depth : planes_max;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
 		for (int layer = 0, len = 2, *level = tree+1; len <= length; level += len*len, len *= 2, ++layer) {
-			int plane = planes-1 - (layers-layer);
-			if (plane < 0 || plane >= planes)
-				continue;
-			for (int chan = 0; chan < 3; ++chan)
+			for (int chan = 0; chan < 3; ++chan) {
+				int plane = planes_max-1 - (layers-layer);
+				if (plane < 0 || plane >= planes[chan])
+					continue;
 				if (decode(rle, level+chan*tree_size, len*len, plane))
 					goto end;
+			}
 		}
 	}
 end:
 	delete_reader(rle);
 	close_reader(bits);
 	for (int chan = 0; chan < 3; ++chan)
-		finalize(tree+chan*tree_size+1, tree_size-1, planes);
+		finalize(tree+chan*tree_size+1, tree_size-1, planes[chan]);
 	int *output = malloc(sizeof(int) * pixels);
 	struct image *image = new_image(argv[2], width, height);
 	for (int chan = 0; chan < 3; ++chan) {

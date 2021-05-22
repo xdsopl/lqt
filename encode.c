@@ -132,11 +132,11 @@ int main(int argc, char **argv)
 		doit(tree+chan*tree_size, input, 0, depth);
 		reorder(tree+chan*tree_size, input, length);
 	}
-	int planes = 0;
+	int planes[3] = { 0 };
 	for (int chan = 0; chan < 3; ++chan) {
 		int cnt = count_planes(tree+chan*tree_size+1, tree_size-1);
-		if (planes < cnt)
-			planes = cnt;
+		if (planes[chan] < cnt)
+			planes[chan] = cnt;
 	}
 	free(input);
 	delete_image(image);
@@ -149,20 +149,26 @@ int main(int argc, char **argv)
 	put_bit(bits, mode);
 	put_vli(bits, width);
 	put_vli(bits, height);
-	put_vli(bits, planes);
 	for (int chan = 0; chan < 3; ++chan)
 		encode_root(bits, tree+chan*tree_size);
+	for (int chan = 0; chan < 3; ++chan)
+		put_vli(bits, planes[chan]);
 	struct rle_writer *rle = rle_writer(bits);
-	int maximum = depth > planes ? depth : planes;
+	int planes_max = 0;
+	for (int chan = 0; chan < 3; ++chan)
+		if (planes_max < planes[chan])
+			planes_max = planes[chan];
+	int maximum = depth > planes_max ? depth : planes_max;
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
 		for (int layer = 0, len = 2, *level = tree+1; len <= length && layer <= layers; level += len*len, len *= 2, ++layer) {
-			int plane = planes-1 - (layers-layer);
-			if (plane < 0 || plane >= planes)
-				continue;
-			for (int chan = 0; chan < 3; ++chan)
-				if (encode(rle, level+chan*tree_size, len*len, plane, planes))
+			for (int chan = 0; chan < 3; ++chan) {
+				int plane = planes_max-1 - (layers-layer);
+				if (plane < 0 || plane >= planes[chan])
+					continue;
+				if (encode(rle, level+chan*tree_size, len*len, plane, planes[chan]))
 					goto end;
+			}
 		}
 	}
 	rle_flush(rle);
