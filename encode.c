@@ -59,15 +59,18 @@ void reorder(int *tree, int *buffer, int length)
 	}
 }
 
-void encode(struct rle_writer *rle, int *level, int size, int plane, int planes)
+int encode(struct rle_writer *rle, int *level, int size, int plane, int planes)
 {
 	int mask = 1 << plane;
 	for (int i = 0; i < size; ++i) {
 		int val = level[i] & mask;
-		put_rle(rle, val);
+		int ret = put_rle(rle, val);
+		if (ret)
+			return ret;
 		if (val && plane == planes-1)
 			level[i] = -level[i];
 	}
+	return 0;
 }
 
 void encode_root(struct bits_writer *bits, int *root)
@@ -92,18 +95,6 @@ int count_planes(int *val, int num)
 		if (max < abs(val[i]))
 			max = abs(val[i]);
 	return 2 + ilog2(max);
-}
-
-int over_capacity(struct bits_writer *bits, int capacity)
-{
-	int cnt = bits_count(bits);
-	if (cnt > capacity) {
-		bits_discard(bits);
-		fprintf(stderr, "%d bits over capacity, discarding.\n", cnt-capacity);
-		return 1;
-	}
-	bits_flush(bits);
-	return 0;
 }
 
 int main(int argc, char **argv)
@@ -161,7 +152,6 @@ int main(int argc, char **argv)
 	put_vli(bits, planes);
 	for (int chan = 0; chan < 3; ++chan)
 		encode_root(bits, tree+chan*tree_size);
-	bits_flush(bits);
 	struct rle_writer *rle = rle_writer(bits);
 	int maximum = depth > planes ? depth : planes;
 	int layers_max = 2 * maximum - 1;
@@ -171,12 +161,11 @@ int main(int argc, char **argv)
 			if (plane < 0 || plane >= planes)
 				continue;
 			for (int chan = 0; chan < 3; ++chan)
-				encode(rle, level+chan*tree_size, len*len, plane, planes);
-			rle_flush(rle);
-			if (over_capacity(bits, capacity))
-				goto end;
+				if (encode(rle, level+chan*tree_size, len*len, plane, planes))
+					goto end;
 		}
 	}
+	rle_flush(rle);
 end:
 	delete_writer(rle);
 	free(tree);
