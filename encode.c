@@ -162,7 +162,16 @@ int main(int argc, char **argv)
 	int layers_max = 2 * maximum - 1;
 	for (int layers = 0; layers < layers_max; ++layers) {
 		for (int layer = 0, len = 2, *level = tree+1; len <= length && layer <= layers; level += len*len, len *= 2, ++layer) {
-			for (int chan = 0; chan < 3; ++chan) {
+			for (int chan = 0; chan < 1; ++chan) {
+				int plane = planes_max-1 - (layers-layer);
+				if (plane < 0 || plane >= planes[chan])
+					continue;
+				if (encode(rle, level+chan*tree_size, len*len, plane, planes[chan]))
+					goto end;
+			}
+		}
+		for (int layer = 0, len = 2, *level = tree+1; len <= length && layer <= layers; level += len*len, len *= 2, ++layer) {
+			for (int chan = 1; chan < 3; ++chan) {
 				int plane = planes_max-1 - (layers-layer);
 				if (plane < 0 || plane >= planes[chan])
 					continue;
