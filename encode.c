@@ -89,14 +89,6 @@ void encode_root(struct vli_writer *vli, int *root)
 		vli_put_bit(vli, *root < 0);
 }
 
-int ilog2(int x)
-{
-	int l = -1;
-	for (; x > 0; x /= 2)
-		++l;
-	return l;
-}
-
 int process(int *val, int num)
 {
 	int max = 0;
