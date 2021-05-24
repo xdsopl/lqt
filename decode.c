@@ -58,15 +58,15 @@ int decode(struct rle_reader *rle, int *level, int size, int plane)
 	return 0;
 }
 
-int decode_root(struct bits_reader *bits, int *root)
+int decode_root(struct vli_reader *vli, int *root)
 {
-	int ret = get_vli(bits);
+	int ret = get_vli(vli);
 	if (ret < 0)
 		return ret;
 	*root = ret;
 	if (!ret)
 		return 0;
-	if ((ret = get_bit(bits)) < 0)
+	if ((ret = vli_get_bit(vli)) < 0)
 		return ret;
 	if (ret)
 		*root = - *root;
@@ -90,9 +90,10 @@ int main(int argc, char **argv)
 	struct bits_reader *bits = bits_reader(argv[1]);
 	if (!bits)
 		return 1;
-	int mode = get_bit(bits);
-	int width = get_vli(bits);
-	int height = get_vli(bits);
+	struct vli_reader *vli = vli_reader(bits);
+	int mode = vli_get_bit(vli);
+	int width = get_vli(vli);
+	int height = get_vli(vli);
 	if ((mode|width|height) < 0)
 		return 1;
 	int length = 1;
@@ -105,13 +106,13 @@ int main(int argc, char **argv)
 	for (int i = 0; i < 3 * tree_size; ++i)
 		tree[i] = 0;
 	for (int chan = 0; chan < 3; ++chan)
-		if (decode_root(bits, tree+chan*tree_size))
+		if (decode_root(vli, tree+chan*tree_size))
 			return 1;
 	int planes[3];
 	for (int chan = 0; chan < 3; ++chan)
-		if ((planes[chan] = get_vli(bits)) < 0)
+		if ((planes[chan] = get_vli(vli)) < 0)
 			return 1;
-	struct rle_reader *rle = rle_reader(bits);
+	struct rle_reader *rle = rle_reader(vli);
 	if (rle_start(rle))
 		goto end;
 	int planes_max = 0;
@@ -141,7 +142,8 @@ int main(int argc, char **argv)
 		}
 	}
 end:
-	delete_reader(rle);
+	delete_rle_reader(rle);
+	delete_vli_reader(vli);
 	close_reader(bits);
 	for (int chan = 0; chan < 3; ++chan)
 		finalize(tree+chan*tree_size+1, tree_size-1, planes[chan]);

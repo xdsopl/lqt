@@ -73,11 +73,11 @@ int encode(struct rle_writer *rle, int *level, int size, int plane, int planes)
 	return 0;
 }
 
-void encode_root(struct bits_writer *bits, int *root)
+void encode_root(struct vli_writer *vli, int *root)
 {
-	put_vli(bits, abs(*root));
+	put_vli(vli, abs(*root));
 	if (*root)
-		put_bit(bits, *root < 0);
+		vli_put_bit(vli, *root < 0);
 }
 
 int ilog2(int x)
@@ -146,14 +146,15 @@ int main(int argc, char **argv)
 	struct bits_writer *bits = bits_writer(argv[2], capacity);
 	if (!bits)
 		return 1;
-	put_bit(bits, mode);
-	put_vli(bits, width);
-	put_vli(bits, height);
+	struct vli_writer *vli = vli_writer(bits);
+	vli_put_bit(vli, mode);
+	put_vli(vli, width);
+	put_vli(vli, height);
 	for (int chan = 0; chan < 3; ++chan)
-		encode_root(bits, tree+chan*tree_size);
+		encode_root(vli, tree+chan*tree_size);
 	for (int chan = 0; chan < 3; ++chan)
-		put_vli(bits, planes[chan]);
-	struct rle_writer *rle = rle_writer(bits);
+		put_vli(vli, planes[chan]);
+	struct rle_writer *rle = rle_writer(vli);
 	int planes_max = 0;
 	for (int chan = 0; chan < 3; ++chan)
 		if (planes_max < planes[chan])
@@ -182,7 +183,8 @@ int main(int argc, char **argv)
 	}
 	rle_flush(rle);
 end:
-	delete_writer(rle);
+	delete_rle_writer(rle);
+	delete_vli_writer(vli);
 	free(tree);
 	int cnt = bits_count(bits);
 	int bytes = (cnt + 7) / 8;
