@@ -59,16 +59,25 @@ void reorder(int *tree, int *buffer, int length)
 	}
 }
 
-int encode(struct rle_writer *rle, int *level, int size, int plane, int planes)
+int encode(struct rle_writer *rle, int *val, int num, int plane)
 {
-	int mask = 1 << plane;
-	for (int i = 0; i < size; ++i) {
-		int val = level[i] & mask;
-		int ret = put_rle(rle, val);
+	int bit_mask = 1 << plane;
+	int int_bits = sizeof(int) * 8;
+	int sgn_pos = int_bits - 1;
+	int sig_pos = int_bits - 2;
+	int sgn_mask = 1 << sgn_pos;
+	int sig_mask = 1 << sig_pos;
+	for (int i = 0; i < num; ++i) {
+		int bit = val[i] & bit_mask;
+		int ret = put_rle(rle, bit);
 		if (ret)
 			return ret;
-		if (val && plane == planes-1)
-			level[i] = -level[i];
+		if (bit && !(val[i] & sig_mask)) {
+			int ret = rle_put_bit(rle, val[i] & sgn_mask);
+			if (ret)
+				return ret;
+			val[i] |= sig_mask;
+		}
 	}
 	return 0;
 }
@@ -88,13 +97,21 @@ int ilog2(int x)
 	return l;
 }
 
-int count_planes(int *val, int num)
+int process(int *val, int num)
 {
 	int max = 0;
-	for (int i = 0; i < num; ++i)
-		if (max < abs(val[i]))
-			max = abs(val[i]);
-	return 2 + ilog2(max);
+	int int_bits = sizeof(int) * 8;
+	int sgn_pos = int_bits - 1;
+	int sig_pos = int_bits - 2;
+	int mix_mask = (1 << sgn_pos) | (1 << sig_pos);
+	for (int i = 0; i < num; ++i) {
+		int sgn = val[i] < 0;
+		int mag = abs(val[i]);
+		if (max < mag)
+			max = mag;
+		val[i] = (sgn << sgn_pos) | (mag & ~mix_mask);
+	}
+	return 1 + ilog2(max);
 }
 
 int main(int argc, char **argv)
@@ -134,7 +151,7 @@ int main(int argc, char **argv)
 	}
 	int planes[3] = { 0 };
 	for (int chan = 0; chan < 3; ++chan) {
-		int cnt = count_planes(tree+chan*tree_size+1, tree_size-1);
+		int cnt = process(tree+chan*tree_size+1, tree_size-1);
 		if (planes[chan] < cnt)
 			planes[chan] = cnt;
 	}
@@ -167,7 +184,7 @@ int main(int argc, char **argv)
 				int plane = planes_max-1 - (layers-layer);
 				if (plane < 0 || plane >= planes[chan])
 					continue;
-				if (encode(rle, level+chan*tree_size, len*len, plane, planes[chan]))
+				if (encode(rle, level+chan*tree_size, len*len, plane))
 					goto end;
 			}
 		}
@@ -176,7 +193,7 @@ int main(int argc, char **argv)
 				int plane = planes_max-1 - (layers-layer);
 				if (plane < 0 || plane >= planes[chan])
 					continue;
-				if (encode(rle, level+chan*tree_size, len*len, plane, planes[chan]))
+				if (encode(rle, level+chan*tree_size, len*len, plane))
 					goto end;
 			}
 		}
