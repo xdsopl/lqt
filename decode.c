@@ -113,8 +113,6 @@ int main(int argc, char **argv)
 		if ((planes[chan] = get_vli(vli)) < 0)
 			return 1;
 	struct rle_reader *rle = rle_reader(vli);
-	if (rle_start(rle))
-		goto end;
 	int planes_max = 0;
 	for (int chan = 0; chan < 3; ++chan)
 		if (planes_max < planes[chan])
