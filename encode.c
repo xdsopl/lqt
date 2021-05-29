@@ -175,7 +175,7 @@ int main(int argc, char **argv)
 	}
 	free(input);
 	delete_image(image);
-	int capacity = 1 << 24;
+	int capacity = 0;
 	if (argc >= 5)
 		capacity = atoi(argv[4]);
 	struct bits_writer *bits = bits_writer(argv[2], capacity);

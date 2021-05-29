@@ -30,7 +30,7 @@ Use the [sRGB](https://en.wikipedia.org/wiki/SRGB) color space directly instead 
 
 ### Limited storage capacity
 
-Use up to ```65536``` bits of space and discard quality bits, if necessary, to stay below ```65536``` bits:
+Use up to ```65536``` bits of space instead of the default ```0``` (no limit) and discard quality bits, if necessary, to stay below ```65536``` bits:
 
 ```
 ./encode smpte.ppm encoded.lqt 1 65536
