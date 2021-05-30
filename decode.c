@@ -1,5 +1,5 @@
 /*
-Decoder for lossless image compression based on the quadtree data structure
+Decoder for lossless and lossy image compression based on the quadtree data structure
 
 Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 */
@@ -123,10 +123,9 @@ int main(int argc, char **argv)
 	if (!bits)
 		return 1;
 	struct vli_reader *vli = vli_reader(bits);
-	int mode = vli_get_bit(vli);
 	int width = get_vli(vli);
 	int height = get_vli(vli);
-	if ((mode|width|height) < 0)
+	if ((width|height) < 0)
 		return 1;
 	int length = 1;
 	int depth = 0;
@@ -188,14 +187,9 @@ end:
 	}
 	free(tree);
 	free(output);
-	if (mode) {
-		for (int i = 0; i < width * height; ++i)
-			image->buffer[3*i] += 128;
-		rgb_image(image);
-	} else {
-		for (int i = 0; i < 3 * width * height; ++i)
-			image->buffer[i] += 128;
-	}
+	for (int i = 0; i < width * height; ++i)
+		image->buffer[3*i] += 128;
+	rgb_image(image);
 	if (!write_ppm(image))
 		return 1;
 	delete_image(image);

@@ -1,5 +1,5 @@
 /*
-Encoder for lossless image compression based on the quadtree data structure
+Encoder for lossless and lossy image compression based on the quadtree data structure
 
 Copyright 2021 Ahmet Inan <xdsopl@gmail.com>
 */
@@ -134,13 +134,10 @@ int process(int *val, int num)
 
 int main(int argc, char **argv)
 {
-	if (argc != 3 && argc != 4 && argc != 5) {
-		fprintf(stderr, "usage: %s input.ppm output.lqt [MODE] [CAPACITY]\n", argv[0]);
+	if (argc != 3 && argc != 4) {
+		fprintf(stderr, "usage: %s input.ppm output.lqt [CAPACITY]\n", argv[0]);
 		return 1;
 	}
-	int mode = 1;
-	if (argc >= 4)
-		mode = atoi(argv[3]);
 	struct image *image = read_ppm(argv[1]);
 	if (!image)
 		return 1;
@@ -151,14 +148,9 @@ int main(int argc, char **argv)
 	while (length < width || length < height)
 		length = 1 << ++depth;
 	int pixels = length * length;
-	if (mode) {
-		rct_image(image);
-		for (int i = 0; i < width * height; ++i)
-			image->buffer[3*i] -= 128;
-	} else {
-		for (int i = 0; i < 3 * width * height; ++i)
-			image->buffer[i] -= 128;
-	}
+	rct_image(image);
+	for (int i = 0; i < width * height; ++i)
+		image->buffer[3*i] -= 128;
 	int *input = malloc(sizeof(int) * pixels);
 	int tree_size = (pixels * 4 - 1) / 3;
 	int *tree = malloc(sizeof(int) * 3 * tree_size);
@@ -176,13 +168,12 @@ int main(int argc, char **argv)
 	free(input);
 	delete_image(image);
 	int capacity = 0;
-	if (argc >= 5)
-		capacity = atoi(argv[4]);
+	if (argc >= 4)
+		capacity = atoi(argv[3]);
 	struct bits_writer *bits = bits_writer(argv[2], capacity);
 	if (!bits)
 		return 1;
 	struct vli_writer *vli = vli_writer(bits);
-	vli_put_bit(vli, mode);
 	put_vli(vli, width);
 	put_vli(vli, height);
 	for (int chan = 0; chan < 3; ++chan)
