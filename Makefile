@@ -1,14 +1,18 @@
 CFLAGS = -std=c99 -W -Wall -O3 -D_GNU_SOURCE=1 -g -fsanitize=address
 LDLIBS = -lm
+RM = rm -f
 
-all: encode decode
+all: lqtenc lqtdec
 
-test: encode decode
-	./encode input.ppm /dev/stdout | ./decode /dev/stdin output.ppm
+test: lqtenc lqtdec
+	./lqtenc input.ppm /dev/stdout | ./lqtdec /dev/stdin output.ppm
 
-%: %.c *.h
+lqtenc: src/encode.c
+	$(CC) $(CFLAGS) $< $(LDLIBS) -o $@
+
+lqtdec: src/decode.c
 	$(CC) $(CFLAGS) $< $(LDLIBS) -o $@
 
 clean:
-	rm -f encode decode
+	$(RM) lqtenc lqtdec
 
